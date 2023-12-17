@@ -1,0 +1,25 @@
+{
+  "name": "prism-util",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/index.js",
+    "format:check": "npx prettier src/**/*.ts --check",
+    "format:write": "npx prettier src/**/*.ts --write"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@keyv/sqlite": "^3.6.6",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "keyv": "^4.5.4"
+  },
+  "devDependencies": {
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,4 @@
+.env
+*.sqlite
+dist/
+node_modules/
