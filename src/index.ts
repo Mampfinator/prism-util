@@ -254,16 +254,20 @@ client.on(Events.InteractionCreate, async interaction => {
     } catch (error) {
         console.error(error);
 
-        if (interaction.isRepliable()) {
-            const errorReply = {
-                ephemeral: true,
-                embeds: [INTERNAL_ERROR_EMBED],
-            };
-            if (interaction.replied) {
-                interaction.followUp(errorReply);
-            } else {
-                interaction.reply(errorReply);
+        try {
+            if (interaction.isRepliable()) {
+                const errorReply = {
+                    ephemeral: true,
+                    embeds: [INTERNAL_ERROR_EMBED],
+                };
+                if (interaction.replied) {
+                    interaction.followUp(errorReply);
+                } else {
+                    interaction.reply(errorReply);
+                }
             }
+        } catch (error) {
+            console.error("Error while attempting to respond with an internal error: ", error);
         }
     }
 });
