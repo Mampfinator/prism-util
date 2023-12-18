@@ -1,20 +1,17 @@
 import {
     ActionRowBuilder,
-    ApplicationCommandType,
     ButtonBuilder,
     ButtonStyle,
     Client,
     Colors,
     CommandInteraction,
     ComponentType,
-    ContextMenuCommandBuilder,
     EmbedBuilder,
     Events,
     GuildTextBasedChannel,
     IntentsBitField,
     MessageContextMenuCommandInteraction,
     PermissionsBitField,
-    SlashCommandBuilder,
 } from "discord.js";
 import "dotenv/config";
 import Keyv from "keyv";
@@ -28,7 +25,9 @@ import {
     PIN_REQUEST_APPROVED_MOD_EMBED,
     PIN_REQUEST_DENIED_FEEDBACK_EMBED,
     PIN_REQUEST_DENIED_MOD_EMBED,
-} from "./embeds";
+    RELAY_CHANNEL_COMMAND,
+    REQUEST_PIN_COMMAND,
+} from "./constants";
 
 const relayChannels = new Keyv(
     process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`,
@@ -272,33 +271,6 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
-const requestPinCommand = new ContextMenuCommandBuilder()
-    .setDMPermission(false)
-    .setName("Request Pin")
-    .setType(ApplicationCommandType.Message);
-
-const relayChannelCommand = new SlashCommandBuilder()
-    .setDMPermission(false)
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
-    .setName("relay-channel")
-    .setDescription("Relay channel for pin requests.")
-    .addSubcommand(set =>
-        set
-            .setName("set")
-            .setDescription("Change the channel to send pin reqests to.")
-            .addChannelOption(channel =>
-                channel
-                    .setName("channel")
-                    .setDescription("The new channel.")
-                    .setRequired(true),
-            ),
-    )
-    .addSubcommand(get =>
-        get
-            .setName("get")
-            .setDescription("Get the channel that's used for pin requests."),
-    );
-
 client.on(Events.ClientReady, async () => {
     const deployInGuild = process.env.DEBUG_GUILD_ID;
 
@@ -309,9 +281,9 @@ client.on(Events.ClientReady, async () => {
         await client.application!.commands.delete(id);
     }
 
-    await client.application!.commands.create(requestPinCommand, deployInGuild);
+    await client.application!.commands.create(REQUEST_PIN_COMMAND, deployInGuild);
     await client.application!.commands.create(
-        relayChannelCommand,
+        RELAY_CHANNEL_COMMAND,
         deployInGuild,
     );
 });

@@ -1,6 +1,10 @@
 import {
+    ApplicationCommandType,
     Colors,
+    ContextMenuCommandBuilder,
     EmbedBuilder,
+    PermissionsBitField,
+    SlashCommandBuilder,
 } from "discord.js";
 
 export const INTERNAL_ERROR_EMBED = new EmbedBuilder()
@@ -37,3 +41,30 @@ export const PIN_REQUEST_DENIED_FEEDBACK_EMBED = new EmbedBuilder()
 export const PIN_REQUEST_DENIED_MOD_EMBED = new EmbedBuilder()
     .setDescription(":x: Pin denied!")
     .setColor(Colors.Red);
+
+export const REQUEST_PIN_COMMAND = new ContextMenuCommandBuilder()
+    .setDMPermission(false)
+    .setName("Request Pin")
+    .setType(ApplicationCommandType.Message);
+
+export const RELAY_CHANNEL_COMMAND = new SlashCommandBuilder()
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
+    .setName("relay-channel")
+    .setDescription("Relay channel for pin requests.")
+    .addSubcommand(set =>
+        set
+            .setName("set")
+            .setDescription("Change the channel to send pin reqests to.")
+            .addChannelOption(channel =>
+                channel
+                    .setName("channel")
+                    .setDescription("The new channel.")
+                    .setRequired(true),
+            ),
+    )
+    .addSubcommand(get =>
+        get
+            .setName("get")
+            .setDescription("Get the channel that's used for pin requests."),
+    );
