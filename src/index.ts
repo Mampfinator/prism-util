@@ -8,6 +8,7 @@ import {
     ComponentType,
     EmbedBuilder,
     Events,
+    GuildMember,
     GuildTextBasedChannel,
     IntentsBitField,
     MessageContextMenuCommandInteraction,
@@ -25,12 +26,15 @@ import {
     PIN_REQUEST_APPROVED_MOD_EMBED,
     PIN_REQUEST_DENIED_FEEDBACK_EMBED,
     PIN_REQUEST_DENIED_MOD_EMBED,
-    RELAY_CHANNEL_COMMAND,
+    REQUEST_CHANNEL_COMMAND,
     REQUEST_PIN_COMMAND,
 } from "./constants";
 
-const relayChannels = new Keyv(
+const requestChannels = new Keyv(
     process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`,
+    {
+        namespace: "request-channel",
+    },
 );
 
 const client = new Client({
@@ -56,17 +60,17 @@ async function handleMessageContextMenuCommand(
             return command.editReply({ embeds: [MISSING_PERMISSIONS_EMBED] });
         }
 
-        const relayChannelId = await relayChannels.get(command.guildId!);
-        if (!relayChannelId) {
+        const requestChannelId = await requestChannels.get(command.guildId!);
+        if (!requestChannelId) {
             return command.editReply({ embeds: [NOT_CONFIGURED_EMBED] });
         }
 
-        const relayChannel = await client.channels.fetch(relayChannelId);
-        if (!relayChannel || !relayChannel.isTextBased()) {
+        const requestChannel = await client.channels.fetch(requestChannelId);
+        if (!requestChannel || !requestChannel.isTextBased()) {
             return command.editReply({ embeds: [INTERNAL_ERROR_EMBED] });
         }
 
-        const requestingMember = command.member;
+        const requestingMember = command.member! as GuildMember;
 
         const fields = [];
 
@@ -115,16 +119,16 @@ async function handleMessageContextMenuCommand(
             value: `[Jump](${targetMessage.url})`,
         });
 
-        const message = await relayChannel.send({
+        const requestMessage = {
             embeds: [
                 new EmbedBuilder()
                     .setColor(Colors.Aqua)
                     .setAuthor({
-                        name: `${requestingMember!.user.username}`,
-                        iconURL: requestingMember?.avatar ?? undefined,
+                        name: `${requestingMember.displayName} (@${requestingMember.user.username})`,
+                        iconURL: requestingMember.displayAvatarURL(),
                     })
                     .setDescription(
-                        `A user is requesting a pin in ${command.channel}.`,
+                        `${requestingMember} is requesting a pin in ${command.channel}.`,
                     )
                     .addFields(...fields),
             ],
@@ -142,7 +146,9 @@ async function handleMessageContextMenuCommand(
                         .setCustomId("request-pin-deny"),
                 ),
             ],
-        });
+        };
+
+        const message = await requestChannel.send(requestMessage);
 
         await command.editReply({ embeds: [PIN_REQUESTED_EMBED] });
 
@@ -161,9 +167,14 @@ async function handleMessageContextMenuCommand(
                 case "request-pin-approve":
                     await targetMessage.pin();
 
-                    await response.update({
-                        components: [],
-                    });
+                    requestMessage.components = [];
+                    requestMessage
+                        .embeds![0]!.setDescription(
+                            `✅ Pin request by ${requestingMember} has been approved by ${response.member}`,
+                        )
+                        .setColor(Colors.Green);
+
+                    await response.update(requestMessage);
 
                     await Promise.all([
                         response.followUp({
@@ -178,9 +189,14 @@ async function handleMessageContextMenuCommand(
 
                     break;
                 case "request-pin-deny":
-                    await response.update({
-                        components: [],
-                    });
+                    requestMessage.components = [];
+                    requestMessage
+                        .embeds![0]!.setDescription(
+                            `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
+                        )
+                        .setColor(Colors.Red);
+
+                    await response.update(requestMessage);
 
                     await Promise.all([
                         response.followUp({
@@ -206,7 +222,7 @@ async function handleMessageContextMenuCommand(
 async function handleSlashCommandInteraction(interaction: CommandInteraction) {
     if (
         interaction.isChatInputCommand() &&
-        interaction.commandName == "relay-channel"
+        interaction.commandName == "request-channel"
     ) {
         const { guildId } = interaction;
 
@@ -214,7 +230,7 @@ async function handleSlashCommandInteraction(interaction: CommandInteraction) {
 
         switch (subcommand) {
             case "get": {
-                const channelId = await relayChannels.get(guildId!);
+                const channelId = await requestChannels.get(guildId!);
                 if (!!channelId) {
                     return interaction.reply({
                         content: `<#${channelId}>`,
@@ -232,7 +248,7 @@ async function handleSlashCommandInteraction(interaction: CommandInteraction) {
                     "channel",
                     true,
                 );
-                await relayChannels.set(guildId!, channelId);
+                await requestChannels.set(guildId!, channelId);
 
                 return interaction.reply({
                     content: `Relay channel set to <#${channelId}>.`,
@@ -266,7 +282,10 @@ client.on(Events.InteractionCreate, async interaction => {
                 }
             }
         } catch (error) {
-            console.error("Error while attempting to respond with an internal error: ", error);
+            console.error(
+                "Error while attempting to respond with an internal error: ",
+                error,
+            );
         }
     }
 });
@@ -281,11 +300,16 @@ client.on(Events.ClientReady, async () => {
         await client.application!.commands.delete(id);
     }
 
-    await client.application!.commands.create(REQUEST_PIN_COMMAND, deployInGuild);
     await client.application!.commands.create(
-        RELAY_CHANNEL_COMMAND,
+        REQUEST_PIN_COMMAND,
         deployInGuild,
     );
+    await client.application!.commands.create(
+        REQUEST_CHANNEL_COMMAND,
+        deployInGuild,
+    );
+
+    console.log(`Logged in as ${client.user!.displayName}`);
 });
 
 client.login(process.env.DISCORD_TOKEN);

@@ -47,11 +47,11 @@ export const REQUEST_PIN_COMMAND = new ContextMenuCommandBuilder()
     .setName("Request Pin")
     .setType(ApplicationCommandType.Message);
 
-export const RELAY_CHANNEL_COMMAND = new SlashCommandBuilder()
+export const REQUEST_CHANNEL_COMMAND = new SlashCommandBuilder()
     .setDMPermission(false)
     .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
-    .setName("relay-channel")
-    .setDescription("Relay channel for pin requests.")
+    .setName("request-channel")
+    .setDescription("Request channel for pin requests.")
     .addSubcommand(set =>
         set
             .setName("set")
