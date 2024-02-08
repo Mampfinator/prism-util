@@ -8,24 +8,28 @@ import {
     ComponentType,
     EmbedBuilder,
     Events,
+    GuildChannel,
     GuildMember,
     GuildTextBasedChannel,
     IntentsBitField,
     MessageContextMenuCommandInteraction,
+    MessageMentions,
+    PermissionFlagsBits,
     PermissionsBitField,
 } from "discord.js";
 import "dotenv/config";
 import Keyv from "keyv";
 import {
-    INTERNAL_ERROR_EMBED,
-    MISSING_PERMISSIONS_EMBED,
-    NOT_CONFIGURED_EMBED,
-    PIN_REQUESTED_EMBED,
-    PIN_REQUEST_ALREADY_PINNED_EMBED,
-    PIN_REQUEST_APPROVED_FEEDBACK_EMBED,
-    PIN_REQUEST_APPROVED_MOD_EMBED,
-    PIN_REQUEST_DENIED_FEEDBACK_EMBED,
-    PIN_REQUEST_DENIED_MOD_EMBED,
+    INTERNAL_ERROR,
+    MISSING_PERMISSIONS,
+    NOT_CONFIGURED,
+    PIN_REQUESTED,
+    PIN_REQUEST_ALREADY_PINNED,
+    PIN_REQUEST_APPROVED_FEEDBACK,
+    PIN_REQUEST_APPROVED_MOD,
+    PIN_REQUEST_DENIED_FEEDBACK,
+    PIN_REQUEST_DENIED_MOD,
+    PIN_REQUEST_DO_IT_YOURSELF,
     REQUEST_CHANNEL_COMMAND,
     REQUEST_PIN_COMMAND,
 } from "./constants";
@@ -57,30 +61,41 @@ async function handleMessageContextMenuCommand(
                 .permissionsFor(client.user!.id)
                 ?.has(PermissionsBitField.Flags.ManageMessages)
         ) {
-            return command.editReply({ embeds: [MISSING_PERMISSIONS_EMBED] });
+            return command.editReply({ embeds: [MISSING_PERMISSIONS] });
         }
 
         const requestChannelId = await requestChannels.get(command.guildId!);
         if (!requestChannelId) {
-            return command.editReply({ embeds: [NOT_CONFIGURED_EMBED] });
+            return command.editReply({ embeds: [NOT_CONFIGURED] });
         }
 
         const requestChannel = await client.channels.fetch(requestChannelId);
         if (!requestChannel || !requestChannel.isTextBased()) {
-            return command.editReply({ embeds: [INTERNAL_ERROR_EMBED] });
+            return command.editReply({ embeds: [INTERNAL_ERROR] });
         }
-
-        const requestingMember = command.member! as GuildMember;
-
-        const fields = [];
 
         const { targetMessage } = command;
 
         if (targetMessage.pinned) {
             return command.editReply({
-                embeds: [PIN_REQUEST_ALREADY_PINNED_EMBED],
+                embeds: [PIN_REQUEST_ALREADY_PINNED],
             });
         }
+
+        const requestingMember = command.member! as GuildMember;
+        if ((command.channel as GuildChannel).permissionsFor(requestingMember).has(PermissionFlagsBits.ManageMessages)) {
+            return command.editReply({
+                embeds: [PIN_REQUEST_DO_IT_YOURSELF]
+            });
+        }
+
+        const fields = [];
+
+        const requestEmbed = new EmbedBuilder()
+            .setColor(Colors.Aqua)
+            .setDescription(
+                `${requestingMember} is requesting a pin in ${command.channel}.`,
+            );
 
         if (!!targetMessage.content && targetMessage.content.length > 0) {
             fields.push({
@@ -101,17 +116,23 @@ async function handleMessageContextMenuCommand(
             });
         }
 
-        if (!!targetMessage.attachments && targetMessage.attachments.size > 0) {
-            fields.push({
-                name: "Attachments",
-                value: [...targetMessage.attachments.values()]
-                    .map(
-                        (attachment, index) =>
-                            `[Attachment (${index + 1})](${attachment.url})`,
-                    )
-                    .join("\n"),
-                inline: true,
-            });
+        if (targetMessage.attachments?.size > 0) {
+            const attachments = [...targetMessage.attachments.values()].map(({url}) => url);
+
+            requestEmbed.setImage(attachments.shift() ?? null);
+
+            if (targetMessage.attachments.size > 1) {
+                fields.push({
+                    name: "Other Attachments",
+                    value: [...attachments.values()]
+                        .map(
+                            (attachment, index) =>
+                                `[Attachment (${index + 1})](${attachment})`,
+                        )
+                        .join("\n"),
+                    inline: true,
+                });
+            }
         }
 
         fields.push({
@@ -119,17 +140,13 @@ async function handleMessageContextMenuCommand(
             value: `[Jump](${targetMessage.url})`,
         });
 
-        const requestMessage = {
+        const requestMessagePayload = {
             embeds: [
-                new EmbedBuilder()
-                    .setColor(Colors.Aqua)
+                requestEmbed
                     .setAuthor({
                         name: `${requestingMember.displayName} (@${requestingMember.user.username})`,
                         iconURL: requestingMember.displayAvatarURL(),
                     })
-                    .setDescription(
-                        `${requestingMember} is requesting a pin in ${command.channel}.`,
-                    )
                     .addFields(...fields),
             ],
             components: [
@@ -148,11 +165,30 @@ async function handleMessageContextMenuCommand(
             ],
         };
 
-        const message = await requestChannel.send(requestMessage);
+        const requestMessage = await requestChannel.send(requestMessagePayload);
 
-        await command.editReply({ embeds: [PIN_REQUESTED_EMBED] });
+        await command.editReply({ embeds: [PIN_REQUESTED] });
 
-        const collector = message.createMessageComponentCollector({
+        for (const embed of targetMessage.embeds) {
+            console.log(embed);
+
+            const newEmbed = { 
+                ...embed.data, 
+                video: undefined,
+                provider: undefined,
+            };
+
+            if (!newEmbed.image && embed.thumbnail) {
+                newEmbed.image = embed.thumbnail;
+            }
+
+            await requestMessage.reply({embeds: [newEmbed], allowedMentions: {
+                users: [],
+                roles: [],
+            }});
+        }
+
+        const collector = requestMessage.createMessageComponentCollector({
             componentType: ComponentType.Button,
             max: 1,
         });
@@ -167,44 +203,44 @@ async function handleMessageContextMenuCommand(
                 case "request-pin-approve":
                     await targetMessage.pin();
 
-                    requestMessage.components = [];
-                    requestMessage
+                    requestMessagePayload.components = [];
+                    requestMessagePayload
                         .embeds![0]!.setDescription(
                             `✅ Pin request by ${requestingMember} has been approved by ${response.member}`,
                         )
                         .setColor(Colors.Green);
 
-                    await response.update(requestMessage);
+                    await response.update(requestMessagePayload);
 
                     await Promise.all([
                         response.followUp({
-                            embeds: [PIN_REQUEST_APPROVED_MOD_EMBED],
+                            embeds: [PIN_REQUEST_APPROVED_MOD],
                             ephemeral: true,
                         }),
                         command.followUp({
-                            embeds: [PIN_REQUEST_APPROVED_FEEDBACK_EMBED],
+                            embeds: [PIN_REQUEST_APPROVED_FEEDBACK],
                             ephemeral: true,
                         }),
                     ]);
 
                     break;
                 case "request-pin-deny":
-                    requestMessage.components = [];
-                    requestMessage
+                    requestMessagePayload.components = [];
+                    requestMessagePayload
                         .embeds![0]!.setDescription(
                             `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
                         )
                         .setColor(Colors.Red);
 
-                    await response.update(requestMessage);
+                    await response.update(requestMessagePayload);
 
                     await Promise.all([
                         response.followUp({
-                            embeds: [PIN_REQUEST_DENIED_MOD_EMBED],
+                            embeds: [PIN_REQUEST_DENIED_MOD],
                             ephemeral: true,
                         }),
                         command.followUp({
-                            embeds: [PIN_REQUEST_DENIED_FEEDBACK_EMBED],
+                            embeds: [PIN_REQUEST_DENIED_FEEDBACK],
                             ephemeral: true,
                         }),
                     ]);
@@ -273,7 +309,7 @@ client.on(Events.InteractionCreate, async interaction => {
             if (interaction.isRepliable()) {
                 const errorReply = {
                     ephemeral: true,
-                    embeds: [INTERNAL_ERROR_EMBED],
+                    embeds: [INTERNAL_ERROR],
                 };
                 if (interaction.replied) {
                     interaction.followUp(errorReply);
