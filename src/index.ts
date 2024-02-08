@@ -13,7 +13,6 @@ import {
     GuildTextBasedChannel,
     IntentsBitField,
     MessageContextMenuCommandInteraction,
-    MessageMentions,
     PermissionFlagsBits,
     PermissionsBitField,
 } from "discord.js";
@@ -27,6 +26,7 @@ import {
     PIN_REQUEST_ALREADY_PINNED,
     PIN_REQUEST_APPROVED_FEEDBACK,
     PIN_REQUEST_APPROVED_MOD,
+    PIN_REQUEST_CANCELLED,
     PIN_REQUEST_DENIED_FEEDBACK,
     PIN_REQUEST_DENIED_MOD,
     PIN_REQUEST_DO_IT_YOURSELF,
@@ -83,9 +83,14 @@ async function handleMessageContextMenuCommand(
         }
 
         const requestingMember = command.member! as GuildMember;
-        if ((command.channel as GuildChannel).permissionsFor(requestingMember).has(PermissionFlagsBits.ManageMessages)) {
+        if (
+            process.env.NODE_ENV == "production" &&
+            (command.channel as GuildChannel)
+                .permissionsFor(requestingMember)
+                .has(PermissionFlagsBits.ManageMessages)
+        ) {
             return command.editReply({
-                embeds: [PIN_REQUEST_DO_IT_YOURSELF]
+                embeds: [PIN_REQUEST_DO_IT_YOURSELF],
             });
         }
 
@@ -117,7 +122,9 @@ async function handleMessageContextMenuCommand(
         }
 
         if (targetMessage.attachments?.size > 0) {
-            const attachments = [...targetMessage.attachments.values()].map(({url}) => url);
+            const attachments = [...targetMessage.attachments.values()].map(
+                ({ url }) => url,
+            );
 
             requestEmbed.setImage(attachments.shift() ?? null);
 
@@ -167,13 +174,24 @@ async function handleMessageContextMenuCommand(
 
         const requestMessage = await requestChannel.send(requestMessagePayload);
 
-        await command.editReply({ embeds: [PIN_REQUESTED] });
+        const requestedMessage = await command.editReply({
+            embeds: [PIN_REQUESTED],
+            components: [
+                new ActionRowBuilder<ButtonBuilder>().addComponents(
+                    new ButtonBuilder()
+                        .setStyle(ButtonStyle.Danger)
+                        .setLabel("Cancel")
+                        .setEmoji("❌")
+                        .setCustomId("request-pin-cancel"),
+                ),
+            ],
+        });
 
         for (const embed of targetMessage.embeds) {
             console.log(embed);
 
-            const newEmbed = { 
-                ...embed.data, 
+            const newEmbed = {
+                ...embed.data,
                 video: undefined,
                 provider: undefined,
             };
@@ -182,22 +200,56 @@ async function handleMessageContextMenuCommand(
                 newEmbed.image = embed.thumbnail;
             }
 
-            await requestMessage.reply({embeds: [newEmbed], allowedMentions: {
-                users: [],
-                roles: [],
-            }});
+            await requestMessage.reply({
+                embeds: [newEmbed],
+                allowedMentions: {
+                    users: [],
+                    roles: [],
+                },
+            });
         }
 
-        const collector = requestMessage.createMessageComponentCollector({
+        const cancellationCollector =
+            requestedMessage.createMessageComponentCollector({
+                componentType: ComponentType.Button,
+                maxComponents: 1,
+            });
+
+        let acted = false;
+
+        cancellationCollector.on("end", async collected => {
+            const response = collected.first();
+            if (!response) return;
+            if (response.customId != "request-pin-cancel") return;
+
+            if (acted) return;
+            acted = true;
+
+            await response.update({ embeds: [PIN_REQUEST_CANCELLED], components: [] });
+
+            requestMessagePayload.components = [];
+            requestMessagePayload.embeds[0]!.setDescription(
+                `❌ Pin request by ${requestingMember} has been cancelled.`,
+            ).setColor(Colors.Red);
+
+            await requestMessage.edit(requestMessagePayload);
+        });
+
+        const modCollector = requestMessage.createMessageComponentCollector({
             componentType: ComponentType.Button,
             max: 1,
         });
 
-        collector.on("end", async collected => {
+        modCollector.on("end", async collected => {
             const response = collected.first();
             if (!response) {
                 return; // this shouldn't ever happen. But it might, because jank!
             }
+
+            if (acted) return;
+            acted = true;
+
+            await requestedMessage.edit({ components: [] });
 
             switch (response.customId) {
                 case "request-pin-approve":

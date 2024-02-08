@@ -32,6 +32,10 @@ export const PIN_REQUESTED = new EmbedBuilder()
     )
     .setColor(Colors.Green);
 
+export const PIN_REQUEST_CANCELLED = new EmbedBuilder()
+    .setDescription(":x: Your pin request was cancelled!")
+    .setColor(Colors.Red);
+
 export const PIN_REQUEST_APPROVED_FEEDBACK = new EmbedBuilder()
     .setDescription(":white_check_mark: Your pin request has been approved!")
     .setColor(Colors.Green);
