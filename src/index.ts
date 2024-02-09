@@ -82,6 +82,9 @@ async function handleMessageContextMenuCommand(
             });
         }
 
+        /**
+         * Member that requested the pin.
+         */
         const requestingMember = command.member! as GuildMember;
         if (
             process.env.NODE_ENV == "production" &&
@@ -94,8 +97,10 @@ async function handleMessageContextMenuCommand(
             });
         }
 
-        const fields = [];
-
+        /**
+         * Embed that is presented to the mods.
+         * Its message also contains the Approve/Deny buttons before the request is acted upon.
+         */
         const requestEmbed = new EmbedBuilder()
             .setColor(Colors.Aqua)
             .setDescription(
@@ -103,14 +108,14 @@ async function handleMessageContextMenuCommand(
             );
 
         if (!!targetMessage.content && targetMessage.content.length > 0) {
-            fields.push({
+            requestEmbed.addFields({
                 name: "Message",
                 value: targetMessage.content,
             });
         }
 
         if (!!targetMessage.stickers && targetMessage.stickers.size > 0) {
-            fields.push({
+            requestEmbed.addFields({
                 name: "Stickers",
                 value: [
                     ...targetMessage.stickers
@@ -129,7 +134,7 @@ async function handleMessageContextMenuCommand(
             requestEmbed.setImage(attachments.shift() ?? null);
 
             if (targetMessage.attachments.size > 1) {
-                fields.push({
+                requestEmbed.addFields({
                     name: "Other Attachments",
                     value: [...attachments.values()]
                         .map(
@@ -142,19 +147,17 @@ async function handleMessageContextMenuCommand(
             }
         }
 
-        fields.push({
+        requestEmbed.addFields({
             name: "\u200b",
             value: `[Jump](${targetMessage.url})`,
         });
 
         const requestMessagePayload = {
             embeds: [
-                requestEmbed
-                    .setAuthor({
-                        name: `${requestingMember.displayName} (@${requestingMember.user.username})`,
-                        iconURL: requestingMember.displayAvatarURL(),
-                    })
-                    .addFields(...fields),
+                requestEmbed.setAuthor({
+                    name: `${requestingMember.displayName} (@${requestingMember.user.username})`,
+                    iconURL: requestingMember.displayAvatarURL(),
+                }),
             ],
             components: [
                 new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -172,8 +175,14 @@ async function handleMessageContextMenuCommand(
             ],
         };
 
+        /**
+         * Mod-facing message.
+         */
         const requestMessage = await requestChannel.send(requestMessagePayload);
 
+        /**
+         * User-facing context menu response.
+         */
         const requestedMessage = await command.editReply({
             embeds: [PIN_REQUESTED],
             components: [
@@ -215,6 +224,11 @@ async function handleMessageContextMenuCommand(
                 maxComponents: 1,
             });
 
+        /**
+         * Whether either party (requesting user, mods) has acted on this request (cancelled/approved/denied).
+         * This prevents a potential rare (but possible) race condition where the client receives button interactions from both
+         * sides at once.
+         */
         let acted = false;
 
         cancellationCollector.on("end", async collected => {
@@ -225,14 +239,21 @@ async function handleMessageContextMenuCommand(
             if (acted) return;
             acted = true;
 
-            await response.update({ embeds: [PIN_REQUEST_CANCELLED], components: [] });
-
-            requestMessagePayload.components = [];
-            requestMessagePayload.embeds[0]!.setDescription(
-                `❌ Pin request by ${requestingMember} has been cancelled.`,
-            ).setColor(Colors.Red);
-
-            await requestMessage.edit(requestMessagePayload);
+            await response.update({
+                embeds: [PIN_REQUEST_CANCELLED],
+                components: [],
+            });
+            // We don't want to present mods the Approve/Deny options anymore, and notify them that the user has cancelled the request.
+            await requestMessage.edit({
+                components: [],
+                embeds: [
+                    new EmbedBuilder(requestEmbed.data)
+                        .setDescription(
+                            `❌ Pin request by ${requestingMember} has been cancelled.`,
+                        )
+                        .setColor(Colors.Red),
+                ],
+            });
         });
 
         const modCollector = requestMessage.createMessageComponentCollector({
@@ -242,27 +263,28 @@ async function handleMessageContextMenuCommand(
 
         modCollector.on("end", async collected => {
             const response = collected.first();
-            if (!response) {
-                return; // this shouldn't ever happen. But it might, because jank!
-            }
+            if (!response) return;
 
             if (acted) return;
             acted = true;
 
+            // remove user-facing options so they can't cancel anymore.
             await requestedMessage.edit({ components: [] });
 
             switch (response.customId) {
                 case "request-pin-approve":
                     await targetMessage.pin();
 
-                    requestMessagePayload.components = [];
-                    requestMessagePayload
-                        .embeds![0]!.setDescription(
-                            `✅ Pin request by ${requestingMember} has been approved by ${response.member}`,
-                        )
-                        .setColor(Colors.Green);
-
-                    await response.update(requestMessagePayload);
+                    await response.update({
+                        components: [],
+                        embeds: [
+                            new EmbedBuilder()
+                                .setDescription(
+                                    `✅ Pin request by ${requestingMember} has been approved by ${response.member}`,
+                                )
+                                .setColor(Colors.Green),
+                        ],
+                    });
 
                     await Promise.all([
                         response.followUp({
@@ -277,14 +299,16 @@ async function handleMessageContextMenuCommand(
 
                     break;
                 case "request-pin-deny":
-                    requestMessagePayload.components = [];
-                    requestMessagePayload
-                        .embeds![0]!.setDescription(
-                            `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
-                        )
-                        .setColor(Colors.Red);
-
-                    await response.update(requestMessagePayload);
+                    await response.update({
+                        components: [],
+                        embeds: [
+                            new EmbedBuilder()
+                                .setDescription(
+                                    `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
+                                )
+                                .setColor(Colors.Red),
+                        ],
+                    });
 
                     await Promise.all([
                         response.followUp({
