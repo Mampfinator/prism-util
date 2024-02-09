@@ -127,20 +127,15 @@ async function handleMessageContextMenuCommand(
         }
 
         if (targetMessage.attachments?.size > 0) {
-            const attachments = [...targetMessage.attachments.values()].map(
-                ({ url }) => url,
-            );
+            const attachments = [...targetMessage.attachments.values()];
 
-            requestEmbed.setImage(attachments.shift() ?? null);
+            requestEmbed.setImage(attachments.shift()?.url ?? null);
 
             if (targetMessage.attachments.size > 1) {
                 requestEmbed.addFields({
                     name: "Other Attachments",
                     value: [...attachments.values()]
-                        .map(
-                            (attachment, index) =>
-                                `[Attachment (${index + 1})](${attachment})`,
-                        )
+                        .map(({ url, name }, index) => `[${name}](${url})`)
                         .join("\n"),
                     inline: true,
                 });
@@ -197,8 +192,6 @@ async function handleMessageContextMenuCommand(
         });
 
         for (const embed of targetMessage.embeds) {
-            console.log(embed);
-
             const newEmbed = {
                 ...embed.data,
                 video: undefined,
@@ -269,7 +262,7 @@ async function handleMessageContextMenuCommand(
             acted = true;
 
             // remove user-facing options so they can't cancel anymore.
-            await requestedMessage.edit({ components: [] });
+            await command.editReply({ components: [] });
 
             switch (response.customId) {
                 case "request-pin-approve":
@@ -278,7 +271,7 @@ async function handleMessageContextMenuCommand(
                     await response.update({
                         components: [],
                         embeds: [
-                            new EmbedBuilder()
+                            new EmbedBuilder(requestEmbed.data)
                                 .setDescription(
                                     `✅ Pin request by ${requestingMember} has been approved by ${response.member}`,
                                 )
@@ -302,7 +295,7 @@ async function handleMessageContextMenuCommand(
                     await response.update({
                         components: [],
                         embeds: [
-                            new EmbedBuilder()
+                            new EmbedBuilder(requestEmbed.data)
                                 .setDescription(
                                     `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
                                 )
