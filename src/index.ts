@@ -6,6 +6,7 @@ import {
     Colors,
     CommandInteraction,
     ComponentType,
+    DiscordAPIError,
     EmbedBuilder,
     Events,
     GuildChannel,
@@ -232,21 +233,25 @@ async function handleMessageContextMenuCommand(
             if (acted) return;
             acted = true;
 
-            await response.update({
-                embeds: [PIN_REQUEST_CANCELLED],
-                components: [],
-            });
-            // We don't want to present mods the Approve/Deny options anymore, and notify them that the user has cancelled the request.
-            await requestMessage.edit({
-                components: [],
-                embeds: [
-                    new EmbedBuilder(requestEmbed.data)
-                        .setDescription(
-                            `❌ Pin request by ${requestingMember} has been cancelled.`,
-                        )
-                        .setColor(Colors.Red),
-                ],
-            });
+            try {
+                await response.update({
+                    embeds: [PIN_REQUEST_CANCELLED],
+                    components: [],
+                });
+                // We don't want to present mods the Approve/Deny options anymore, and notify them that the user has cancelled the request.
+                await requestMessage.edit({
+                    components: [],
+                    embeds: [
+                        new EmbedBuilder(requestEmbed.data)
+                            .setDescription(
+                                `❌ Pin request by ${requestingMember} has been cancelled.`,
+                            )
+                            .setColor(Colors.Red),
+                    ],
+                });
+            } catch (error) {
+                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
+            }
         });
 
         const modCollector = requestMessage.createMessageComponentCollector({
@@ -262,7 +267,11 @@ async function handleMessageContextMenuCommand(
             acted = true;
 
             // remove user-facing options so they can't cancel anymore.
-            await command.editReply({ components: [] });
+            try {
+                await command.editReply({ components: [] });
+            } catch (error) {
+                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
+            }
 
             switch (response.customId) {
                 case "request-pin-approve":
