@@ -14,8 +14,11 @@ import {
     GuildTextBasedChannel,
     IntentsBitField,
     MessageContextMenuCommandInteraction,
+    ModalBuilder,
     PermissionFlagsBits,
     PermissionsBitField,
+    TextInputBuilder,
+    TextInputStyle,
 } from "discord.js";
 import "dotenv/config";
 import Keyv from "keyv";
@@ -33,6 +36,7 @@ import {
     PIN_REQUEST_DO_IT_YOURSELF,
     REQUEST_CHANNEL_COMMAND,
     REQUEST_PIN_COMMAND,
+    makeRequestDeniedFeedback,
 } from "./constants";
 
 const requestChannels = new Keyv(
@@ -301,15 +305,51 @@ async function handleMessageContextMenuCommand(
 
                     break;
                 case "request-pin-deny":
-                    await response.update({
+                    await response.showModal(
+                        new ModalBuilder()
+                            .setCustomId("reason-modal")
+                            .setTitle("Reason")
+                            .addComponents(
+                                new ActionRowBuilder<TextInputBuilder>().addComponents(
+                                    new TextInputBuilder()
+                                        .setLabel("Reason")
+                                        .setStyle(TextInputStyle.Paragraph)
+                                        .setCustomId("reason")
+                                        .setPlaceholder(
+                                            "Enter your reason for denying this request here. Leave blank for no reason.",
+                                        )
+                                        .setRequired(false),
+                                ),
+                            ),
+                    );
+
+                    const modalResponse = await response.awaitModalSubmit({
+                        time: 2 * 60 * 1000, // 2 minutes are *definitely* enough to type up a reason.
+                    });
+
+                    modalResponse.deferUpdate();
+
+                    const reason =
+                        modalResponse.fields
+                            .getField("reason", ComponentType.TextInput)
+                            ?.value?.trim() ?? "";
+
+                    const responseEmbed = new EmbedBuilder(requestEmbed.data)
+                        .setDescription(
+                            `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
+                        )
+                        .setColor(Colors.Red);
+
+                    if (reason.length > 0) {
+                        responseEmbed.addFields({
+                            name: "Reason",
+                            value: reason,
+                        });
+                    }
+
+                    await response.editReply({
                         components: [],
-                        embeds: [
-                            new EmbedBuilder(requestEmbed.data)
-                                .setDescription(
-                                    `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
-                                )
-                                .setColor(Colors.Red),
-                        ],
+                        embeds: [responseEmbed],
                     });
 
                     await Promise.all([
@@ -318,7 +358,7 @@ async function handleMessageContextMenuCommand(
                             ephemeral: true,
                         }),
                         command.followUp({
-                            embeds: [PIN_REQUEST_DENIED_FEEDBACK],
+                            embeds: [makeRequestDeniedFeedback(reason)],
                             ephemeral: true,
                         }),
                     ]);

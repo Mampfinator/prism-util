@@ -43,6 +43,19 @@ export const PIN_REQUEST_APPROVED_MOD = new EmbedBuilder()
     .setDescription(":white_check_mark: Pin approved!")
     .setColor(Colors.Green);
 
+export function makeRequestDeniedFeedback(reason?: string): EmbedBuilder {
+    if (reason && reason.length > 0) {
+        return new EmbedBuilder(
+            structuredClone(PIN_REQUEST_DENIED_FEEDBACK.data),
+        ).addFields({
+            name: "Reason",
+            value: reason,
+        });
+    } else {
+        return PIN_REQUEST_DENIED_FEEDBACK;
+    }
+}
+
 export const PIN_REQUEST_DENIED_FEEDBACK = new EmbedBuilder()
     .setDescription(":x: Your pin request has been denied!")
     .setColor(Colors.Red);
