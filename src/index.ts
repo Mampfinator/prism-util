@@ -31,7 +31,6 @@ import {
     PIN_REQUEST_APPROVED_FEEDBACK,
     PIN_REQUEST_APPROVED_MOD,
     PIN_REQUEST_CANCELLED,
-    PIN_REQUEST_DENIED_FEEDBACK,
     PIN_REQUEST_DENIED_MOD,
     PIN_REQUEST_DO_IT_YOURSELF,
     REQUEST_CHANNEL_COMMAND,
@@ -254,7 +253,11 @@ async function handleMessageContextMenuCommand(
                     ],
                 });
             } catch (error) {
-                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
+                if (
+                    !(error instanceof DiscordAPIError) ||
+                    Number(error.code) == 10008
+                )
+                    throw error;
             }
         });
 
@@ -274,7 +277,11 @@ async function handleMessageContextMenuCommand(
             try {
                 await command.editReply({ components: [] });
             } catch (error) {
-                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
+                if (
+                    !(error instanceof DiscordAPIError) ||
+                    Number(error.code) == 10008
+                )
+                    throw error;
             }
 
             switch (response.customId) {
