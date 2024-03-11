@@ -89,3 +89,42 @@ export const REQUEST_CHANNEL_COMMAND = new SlashCommandBuilder()
             .setName("get")
             .setDescription("Get the channel that's used for pin requests."),
     );
+
+export const CUSTOM_ROLE_COMMAND = new SlashCommandBuilder()
+    .setDMPermission(false)
+    .setName("custom-role")
+    .setDescription("Manage your Server Booster custom role.")
+    .addSubcommand(edit =>
+        edit
+            .setName("edit")
+            .setDescription(
+                "Edit your role. This can also be used to create your role.",
+            ),
+    )
+    .addSubcommand(remove =>
+        remove.setName("delete").setDescription("Delete your custom role."),
+    );
+
+export const CUSTOM_ROLE_NEED_BOOSTER = new EmbedBuilder()
+    .setColor(Colors.Red)
+    .setDescription(
+        ":x: You need to be a [Server Booster](https://support.discord.com/hc/en-us/articles/360028038352-Server-Boosting-FAQ#h_01HGX7DJ331AJ25MPQRD6R83KJ) to use this feature.",
+    );
+
+export const CUSTOM_ROLE_NO_ROLE = new EmbedBuilder()
+    .setColor(Colors.Red)
+    .setDescription(":x: You don't have a custom role!");
+
+// TODO: set of admin-only commands; one of which to import Copa roles
+// actual code would look something like
+/*
+for every role between the anchor and the cutoff:
+  if role.members.length != 1:
+    continue; // probably not a target role
+  
+  member = role.members.first();
+  if !member.is_boosting()
+    continue; // there's something fishy, possibly warn somewhere
+  
+  custom_roles.insert(member.id, role.id)
+*/

@@ -17,12 +17,16 @@ import {
     ModalBuilder,
     PermissionFlagsBits,
     PermissionsBitField,
+    Snowflake,
     TextInputBuilder,
     TextInputStyle,
 } from "discord.js";
 import "dotenv/config";
 import Keyv from "keyv";
 import {
+    CUSTOM_ROLE_COMMAND,
+    CUSTOM_ROLE_NEED_BOOSTER,
+    CUSTOM_ROLE_NO_ROLE,
     INTERNAL_ERROR,
     MISSING_PERMISSIONS,
     NOT_CONFIGURED,
@@ -38,12 +42,19 @@ import {
     makeRequestDeniedFeedback,
 } from "./constants";
 
-const requestChannels = new Keyv(
-    process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`,
-    {
-        namespace: "request-channel",
-    },
-);
+const DB_PATH = process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`;
+
+const requestChannels = new Keyv(DB_PATH, {
+    namespace: "request-channel",
+});
+
+// TODO: implement wrapper that abstracts weird storage internals?
+/**
+ * Custom roles are stored as `{serverId}:{userId} => {roleId}`.
+ */
+const customRoles = new Keyv(DB_PATH, {
+    namespace: "custom-role",
+});
 
 const client = new Client({
     intents: [
@@ -381,10 +392,9 @@ async function handleMessageContextMenuCommand(
 }
 
 async function handleSlashCommandInteraction(interaction: CommandInteraction) {
-    if (
-        interaction.isChatInputCommand() &&
-        interaction.commandName == "request-channel"
-    ) {
+    if (!interaction.isChatInputCommand()) return;
+
+    if (interaction.commandName == "request-channel") {
         const { guildId } = interaction;
 
         const subcommand = interaction.options.getSubcommand();
@@ -415,6 +425,98 @@ async function handleSlashCommandInteraction(interaction: CommandInteraction) {
                     content: `Relay channel set to <#${channelId}>.`,
                     ephemeral: true,
                 });
+            }
+        }
+    } else if (interaction.commandName == "custom-role") {
+        const subcommand = interaction.options.getSubcommand(true) as
+            | "edit"
+            | "remove"
+            | "info";
+
+        const isBoosting = !!(interaction.member! as GuildMember).premiumSince;
+
+        if (!isBoosting) {
+            return interaction.reply({
+                embeds: [CUSTOM_ROLE_NEED_BOOSTER],
+                ephemeral: true,
+            });
+        }
+
+        const roleId: Snowflake | undefined = await customRoles
+            .get(`${interaction.guildId}:${interaction.user.id}`)
+            .catch(() => {});
+
+        switch (subcommand) {
+            case "remove": {
+                if (!roleId) {
+                    return interaction.reply({
+                        embeds: [CUSTOM_ROLE_NO_ROLE],
+                        ephemeral: true,
+                    });
+                }
+
+                await interaction.guild!.roles.delete(roleId);
+
+                return interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor(Colors.Green)
+                            .setDescription(
+                                ":white_check_mark: Your role has been deleted.",
+                            ),
+                    ],
+                    ephemeral: true,
+                });
+            }
+
+            case "edit": {
+                let role = await interaction
+                    .guild!.roles.fetch(roleId!)
+                    .catch(() => {});
+
+                const roleNameInput = new TextInputBuilder()
+                    .setCustomId("role-name")
+                    .setRequired(true);
+
+                const roleIconInput = new TextInputBuilder().setCustomId(
+                    "role-icon",
+                );
+                if (!!role) {
+                    roleNameInput.setValue(role.name);
+                    if (!!role.icon) roleIconInput.setValue(role.icon);
+                }
+
+                const modal = new ModalBuilder()
+                    .setCustomId("edit-role")
+                    .setTitle("Edit Custom Role")
+                    .addComponents(
+                        new ActionRowBuilder<TextInputBuilder>().addComponents(
+                            roleNameInput,
+                        ),
+                        new ActionRowBuilder<TextInputBuilder>().addComponents(
+                            roleIconInput,
+                        ),
+                    );
+
+                await interaction.showModal(modal);
+
+                const roleEdit = await interaction.awaitModalSubmit({
+                    time: 1000 * 60 * 2,
+                });
+
+                await roleEdit.deferReply().catch(() => {});
+
+                const roleName = roleEdit.fields.getTextInputValue("role-name");
+                const roleIcon = roleEdit.fields.getField("role-icon").value;
+
+                if (!role) {
+                    await interaction.guild!.roles.create({
+                        name: roleName,
+                        icon: roleIcon,
+                    });
+                } else {
+                    await role.edit({ name: roleName, icon: roleIcon });
+                }
             }
         }
     }
@@ -451,6 +553,19 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 });
 
+client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
+    // member has stopped boosting
+    if (!!oldMember.premiumSince && !newMember.premiumSince) {
+        const roleId = await customRoles.get(
+            `${newMember.guild.id}:${newMember.id}`,
+        );
+
+        if (!roleId) return;
+
+        await newMember.guild.roles.delete(roleId).catch(() => {});
+    }
+});
+
 client.on(Events.ClientReady, async () => {
     const deployInGuild = process.env.DEBUG_GUILD_ID;
 
@@ -467,6 +582,10 @@ client.on(Events.ClientReady, async () => {
     );
     await client.application!.commands.create(
         REQUEST_CHANNEL_COMMAND,
+        deployInGuild,
+    );
+    await client.application!.commands.create(
+        CUSTOM_ROLE_COMMAND,
         deployInGuild,
     );
 
