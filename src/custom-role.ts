@@ -11,7 +11,6 @@ import {
     Snowflake,
     TextInputBuilder,
 } from "discord.js";
-import { CommandType } from "./command-loader";
 
 export const CUSTOM_ROLE_NEED_BOOSTER = new EmbedBuilder()
     .setColor(Colors.Red)
@@ -24,7 +23,7 @@ export const CUSTOM_ROLE_NO_ROLE = new EmbedBuilder()
     .setDescription(":x: You don't have a custom role!");
 
 export const CUSTOM_ROLE_COMMAND = {
-    type: CommandType.SlashCommand as const,
+    type: "SlashCommand" as const,
     builder: new SlashCommandBuilder()
         .setName("custom-role")
         .setDescription("Manage your Server Booster custom role.")

@@ -18,7 +18,6 @@ import {
     TextInputBuilder,
     TextInputStyle,
 } from "discord.js";
-import { CommandType } from "./command-loader";
 import {
     INTERNAL_ERROR,
     MISSING_PERMISSIONS,
@@ -71,7 +70,7 @@ export const PIN_REQUEST_DENIED_MOD = new EmbedBuilder()
     .setColor(Colors.Red);
 
 export const REQUEST_PIN_COMMAND = {
-    type: CommandType.MessageContextMenuCommand as const,
+    type: "MessageContextMenuCommand" as const,
     builder: new ContextMenuCommandBuilder()
         .setDMPermission(false)
         .setName("Request Pin")

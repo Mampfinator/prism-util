@@ -4,10 +4,9 @@ import {
     PermissionsBitField,
     SlashCommandBuilder,
 } from "discord.js";
-import { CommandType } from "./command-loader";
 
 export const CONFIG_COMMAND = {
-    type: CommandType.SlashCommand as const,
+    type: "SlashCommand" as const,
     builder: new SlashCommandBuilder()
         .setName("config")
         .setDescription("Config commands")

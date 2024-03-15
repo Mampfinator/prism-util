@@ -8,23 +8,24 @@ import {
     UserContextMenuCommandInteraction,
 } from "discord.js";
 
-export enum CommandType {
-    SlashCommand = "SlashCommand",
-    MessageContextMenuCommand = "MessageContextMenuCommand",
-    UserContextMenuCommand = "UserContextMenuCommand",
-}
+export const COMMAND_TYPES = [
+    "SlashCommand",
+    "MessageContextMenuCommand",
+    "UserContextMenuCommand",
+] as const;
+export type CommandType = (typeof COMMAND_TYPES)[number];
 
 // lookup table
 type BuilderTypes = {
-    [CommandType.SlashCommand]: SlashCommandBuilder;
-    [CommandType.MessageContextMenuCommand]: ContextMenuCommandBuilder;
-    [CommandType.UserContextMenuCommand]: ContextMenuCommandBuilder;
+    SlashCommand: SlashCommandBuilder;
+    MessageContextMenuCommand: ContextMenuCommandBuilder;
+    UserContextMenuCommand: ContextMenuCommandBuilder;
 };
 
 type CommandInteractionTypes = {
-    [CommandType.SlashCommand]: ChatInputCommandInteraction;
-    [CommandType.MessageContextMenuCommand]: MessageContextMenuCommandInteraction;
-    [CommandType.UserContextMenuCommand]: UserContextMenuCommandInteraction;
+    SlashCommand: ChatInputCommandInteraction;
+    MessageContextMenuCommand: MessageContextMenuCommandInteraction;
+    UserContextMenuCommand: UserContextMenuCommandInteraction;
 };
 
 export interface Command<T extends CommandType> {
@@ -34,78 +35,60 @@ export interface Command<T extends CommandType> {
     init?(client: Client): any;
 }
 
-export class CommandLoader {
-    readonly slashCommands: Command<CommandType.SlashCommand>[] = [];
-    readonly messageContextMenuCommands: Command<CommandType.MessageContextMenuCommand>[] =
-        [];
-    readonly userContextMenuCommands: Command<CommandType.UserContextMenuCommand>[] =
-        [];
+type CommandRecord = { [T in CommandType]: Command<T>[] };
 
-    constructor(public readonly client: Client) {}
+export class CommandLoader {
+    private readonly commands: CommandRecord;
+
+    constructor(public readonly client: Client) {
+        // TypeScript has trouble reasoning about this.
+        // This assertion *should* be valid.
+        this.commands = Object.fromEntries(
+            COMMAND_TYPES.map(type => [type, []]),
+        ) as any as CommandRecord;
+    }
 
     public addCommand<T extends CommandType>(command: Command<T>) {
-        // TS isn't able to infer T here for some reason, so we have to cast.
-        switch (command.type) {
-            case CommandType.SlashCommand:
-                this.slashCommands.push(
-                    command as Command<CommandType.SlashCommand>,
-                );
-                break;
-            case CommandType.MessageContextMenuCommand:
-                this.messageContextMenuCommands.push(
-                    command as Command<CommandType.MessageContextMenuCommand>,
-                );
-                break;
-            case CommandType.UserContextMenuCommand:
-                this.userContextMenuCommands.push(
-                    command as Command<CommandType.UserContextMenuCommand>,
-                );
-                break;
+        this.commands[command.type].push(command);
+    }
+
+    getType(interaction: CommandInteraction): CommandType | undefined {
+        if (interaction.isChatInputCommand()) {
+            return "SlashCommand";
+        } else if (interaction.isMessageContextMenuCommand()) {
+            return "MessageContextMenuCommand";
+        } else if (interaction.isUserContextMenuCommand()) {
+            return "UserContextMenuCommand";
         }
+    }
+
+    iterCommands(): Command<CommandType>[] {
+        return COMMAND_TYPES.map(type => this.commands[type]).flat();
     }
 
     public async handleInteraction(interaction: CommandInteraction) {
         console.log(`Executing command "${interaction.commandName}".`);
 
-        let handler: Command<any>["execute"] | undefined;
+        const type = this.getType(interaction);
 
-        if (interaction.isChatInputCommand()) {
-            handler = this.slashCommands.find(
-                c => c.builder.name == interaction.commandName,
-            )?.execute;
+        if (!type) {
+            return;
         }
 
-        if (interaction.isMessageContextMenuCommand()) {
-            handler = this.messageContextMenuCommands.find(
-                c => c.builder.name == interaction.commandName,
-            )?.execute;
+        const command = this.commands[type].find(
+            c => c.builder.name == interaction.commandName,
+        );
+
+        if (!command) {
+            console.log(`${type} "${interaction.commandName}" not found.`);
+            return;
         }
 
-        if (interaction.isUserContextMenuCommand()) {
-            handler = this.userContextMenuCommands.find(
-                c => c.builder.name == interaction.commandName,
-            )?.execute;
-        }
-
-        if (!!handler) {
-            await handler(interaction).catch(error => {
-                console.log(
-                    `Error executing command ${interaction.commandName}: `,
-                    error,
-                );
-            });
-            console.log(`Executed command "${interaction.commandName}".`);
-        } else {
-            console.warn(`No such command: ${interaction.commandName}.`);
-        }
+        await command.execute(interaction as any);
     }
 
     public async init() {
-        for (const command of [
-            ...this.slashCommands,
-            ...this.messageContextMenuCommands,
-            ...this.userContextMenuCommands,
-        ]) {
+        for (const command of this.iterCommands()) {
             if (command.init) {
                 await command.init(this.client);
             }
@@ -113,11 +96,7 @@ export class CommandLoader {
     }
 
     public async register(debugGuildId?: string) {
-        for (const command of [
-            ...this.slashCommands,
-            ...this.messageContextMenuCommands,
-            ...this.userContextMenuCommands,
-        ]) {
+        for (const command of this.iterCommands()) {
             console.log(
                 `Registering command "${command.builder.name}" of type "${command.type}".`,
             );
