@@ -1,4 +1,3 @@
-// TODO: Refactor! We need a proper command loader if we continue adding stuff to this. This is becoming less maintainable by the day.
 import {
     Client,
     ClientOptions as DjsClientOptions,

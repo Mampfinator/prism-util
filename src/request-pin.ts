@@ -23,15 +23,52 @@ import {
     INTERNAL_ERROR,
     MISSING_PERMISSIONS,
     NOT_CONFIGURED,
-    PIN_REQUESTED,
-    PIN_REQUEST_ALREADY_PINNED,
-    PIN_REQUEST_APPROVED_FEEDBACK,
-    PIN_REQUEST_APPROVED_MOD,
-    PIN_REQUEST_CANCELLED,
-    PIN_REQUEST_DENIED_MOD,
-    PIN_REQUEST_DO_IT_YOURSELF,
-    makeRequestDeniedFeedback,
 } from "./constants";
+
+export const PIN_REQUEST_ALREADY_PINNED = new EmbedBuilder()
+    .setDescription(":x: This message is already pinned, silly!")
+    .setColor(Colors.Red);
+
+export const PIN_REQUEST_DO_IT_YOURSELF = new EmbedBuilder()
+    .setDescription(":x: Just pin it yourself, stoobid.")
+    .setColor(Colors.Red);
+
+export const PIN_REQUESTED = new EmbedBuilder()
+    .setDescription(
+        ":white_check_mark: Your request has been sent to the mods! Please be patient while they have a look. :coffee:",
+    )
+    .setColor(Colors.Green);
+
+export const PIN_REQUEST_CANCELLED = new EmbedBuilder()
+    .setDescription(":x: Your pin request was cancelled!")
+    .setColor(Colors.Red);
+
+export const PIN_REQUEST_APPROVED_FEEDBACK = new EmbedBuilder()
+    .setDescription(":white_check_mark: Your pin request has been approved!")
+    .setColor(Colors.Green);
+export const PIN_REQUEST_APPROVED_MOD = new EmbedBuilder()
+    .setDescription(":white_check_mark: Pin approved!")
+    .setColor(Colors.Green);
+
+export function makeRequestDeniedFeedback(reason?: string): EmbedBuilder {
+    if (reason && reason.length > 0) {
+        return new EmbedBuilder(
+            structuredClone(PIN_REQUEST_DENIED_FEEDBACK.data),
+        ).addFields({
+            name: "Reason",
+            value: reason,
+        });
+    } else {
+        return PIN_REQUEST_DENIED_FEEDBACK;
+    }
+}
+
+export const PIN_REQUEST_DENIED_FEEDBACK = new EmbedBuilder()
+    .setDescription(":x: Your pin request has been denied!")
+    .setColor(Colors.Red);
+export const PIN_REQUEST_DENIED_MOD = new EmbedBuilder()
+    .setDescription(":x: Pin denied!")
+    .setColor(Colors.Red);
 
 export const REQUEST_PIN_COMMAND = {
     type: CommandType.MessageContextMenuCommand as const,

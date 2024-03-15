@@ -12,7 +12,16 @@ import {
     TextInputBuilder,
 } from "discord.js";
 import { CommandType } from "./command-loader";
-import { CUSTOM_ROLE_NEED_BOOSTER, CUSTOM_ROLE_NO_ROLE } from "./constants";
+
+export const CUSTOM_ROLE_NEED_BOOSTER = new EmbedBuilder()
+    .setColor(Colors.Red)
+    .setDescription(
+        ":x: You need to be a [Server Booster](https://support.discord.com/hc/en-us/articles/360028038352-Server-Boosting-FAQ#h_01HGX7DJ331AJ25MPQRD6R83KJ) to use this feature.",
+    );
+
+export const CUSTOM_ROLE_NO_ROLE = new EmbedBuilder()
+    .setColor(Colors.Red)
+    .setDescription(":x: You don't have a custom role!");
 
 export const CUSTOM_ROLE_COMMAND = {
     type: CommandType.SlashCommand as const,
