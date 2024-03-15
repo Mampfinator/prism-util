@@ -63,33 +63,6 @@ export const PIN_REQUEST_DENIED_MOD = new EmbedBuilder()
     .setDescription(":x: Pin denied!")
     .setColor(Colors.Red);
 
-export const REQUEST_PIN_COMMAND = new ContextMenuCommandBuilder()
-    .setDMPermission(false)
-    .setName("Request Pin")
-    .setType(ApplicationCommandType.Message);
-
-export const REQUEST_CHANNEL_COMMAND = new SlashCommandBuilder()
-    .setDMPermission(false)
-    .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageMessages)
-    .setName("request-channel")
-    .setDescription("Request channel for pin requests.")
-    .addSubcommand(set =>
-        set
-            .setName("set")
-            .setDescription("Change the channel to send pin reqests to.")
-            .addChannelOption(channel =>
-                channel
-                    .setName("channel")
-                    .setDescription("The new channel.")
-                    .setRequired(true),
-            ),
-    )
-    .addSubcommand(get =>
-        get
-            .setName("get")
-            .setDescription("Get the channel that's used for pin requests."),
-    );
-
 export const CUSTOM_ROLE_COMMAND = new SlashCommandBuilder()
     .setDMPermission(false)
     .setName("custom-role")
