@@ -30,9 +30,7 @@ export const CUSTOM_ROLE_COMMAND = {
         .addSubcommand(edit =>
             edit
                 .setName("edit")
-                .setDescription(
-                    "Edit your role. This can also be used to create your role.",
-                ),
+                .setDescription("Edit your role. This can also be used to create your role."),
         )
         .addSubcommand(remove =>
             remove.setName("delete").setDescription("Delete your custom role."),
@@ -43,25 +41,18 @@ export const CUSTOM_ROLE_COMMAND = {
 
             // member has stopped boosting
             if (!!oldMember.premiumSince && !newMember.premiumSince) {
-                const roleId = await customRoles.get(
-                    `${newMember.guild.id}:${newMember.id}`,
-                );
+                const roleId = await customRoles.get(`${newMember.guild.id}:${newMember.id}`);
 
                 if (!roleId) return;
 
                 await newMember.guild.roles.delete(roleId).catch(() => {});
                 // delete custom role entry
-                await customRoles.delete(
-                    `${newMember.guild.id}:${newMember.id}`,
-                );
+                await customRoles.delete(`${newMember.guild.id}:${newMember.id}`);
             }
         });
     },
     execute: async (interaction: ChatInputCommandInteraction) => {
-        const subcommand = interaction.options.getSubcommand(true) as
-            | "edit"
-            | "remove"
-            | "info";
+        const subcommand = interaction.options.getSubcommand(true) as "edit" | "remove" | "info";
 
         const isBoosting = !!(interaction.member! as GuildMember).premiumSince;
 
@@ -72,10 +63,9 @@ export const CUSTOM_ROLE_COMMAND = {
             });
         }
 
-        const roleId: Snowflake | undefined =
-            await interaction.client.customRoles
-                .get(`${interaction.guildId}:${interaction.user.id}`)
-                .catch(() => {});
+        const roleId: Snowflake | undefined = await interaction.client.customRoles
+            .get(`${interaction.guildId}:${interaction.user.id}`)
+            .catch(() => {});
 
         switch (subcommand) {
             case "remove": {
@@ -92,26 +82,20 @@ export const CUSTOM_ROLE_COMMAND = {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(Colors.Green)
-                            .setDescription(
-                                ":white_check_mark: Your role has been deleted.",
-                            ),
+                            .setDescription(":white_check_mark: Your role has been deleted."),
                     ],
                     ephemeral: true,
                 });
             }
 
             case "edit": {
-                let role = await interaction
-                    .guild!.roles.fetch(roleId!)
-                    .catch(() => {});
+                let role = await interaction.guild!.roles.fetch(roleId!).catch(() => {});
 
                 const roleNameInput = new TextInputBuilder()
                     .setCustomId("role-name")
                     .setRequired(true);
 
-                const roleIconInput = new TextInputBuilder().setCustomId(
-                    "role-icon",
-                );
+                const roleIconInput = new TextInputBuilder().setCustomId("role-icon");
                 if (!!role) {
                     roleNameInput.setValue(role.name);
                     if (!!role.icon) roleIconInput.setValue(role.icon);
@@ -121,12 +105,8 @@ export const CUSTOM_ROLE_COMMAND = {
                     .setCustomId("edit-role")
                     .setTitle("Edit Custom Role")
                     .addComponents(
-                        new ActionRowBuilder<TextInputBuilder>().addComponents(
-                            roleNameInput,
-                        ),
-                        new ActionRowBuilder<TextInputBuilder>().addComponents(
-                            roleIconInput,
-                        ),
+                        new ActionRowBuilder<TextInputBuilder>().addComponents(roleNameInput),
+                        new ActionRowBuilder<TextInputBuilder>().addComponents(roleIconInput),
                     );
 
                 await interaction.showModal(modal);

@@ -78,12 +78,10 @@ export class CommandLoader {
 
     /**
      * Handle a command interaction.
-     * 
+     *
      * @returns Whether the interaction was handled.
      */
-    public async handleInteraction(
-        interaction: CommandInteraction,
-    ): Promise<boolean> {
+    public async handleInteraction(interaction: CommandInteraction): Promise<boolean> {
         console.log(`Executing command "${interaction.commandName}".`);
 
         const type = this.getType(interaction);
@@ -92,9 +90,7 @@ export class CommandLoader {
             return false;
         }
 
-        const command = this.commands[type].find(
-            c => c.builder.name == interaction.commandName,
-        );
+        const command = this.commands[type].find(c => c.builder.name == interaction.commandName);
 
         if (!command) {
             console.log(`${type} "${interaction.commandName}" not found.`);
@@ -123,14 +119,9 @@ export class CommandLoader {
      */
     public async register(debugGuildId?: string) {
         for (const command of this.iterCommands()) {
-            console.log(
-                `Registering command "${command.builder.name}" of type "${command.type}".`,
-            );
+            console.log(`Registering command "${command.builder.name}" of type "${command.type}".`);
 
-            await this.client.application!.commands.create(
-                command.builder,
-                debugGuildId,
-            );
+            await this.client.application!.commands.create(command.builder, debugGuildId);
         }
     }
 

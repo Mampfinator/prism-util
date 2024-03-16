@@ -1,9 +1,4 @@
-import {
-    Client,
-    ClientOptions as DjsClientOptions,
-    Events,
-    IntentsBitField,
-} from "discord.js";
+import { Client, ClientOptions as DjsClientOptions, Events, IntentsBitField } from "discord.js";
 import "dotenv/config";
 import Keyv from "keyv";
 import { CommandLoader } from "./command-loader";
@@ -54,10 +49,7 @@ function makeClient(options: CustomClientOptions): Client {
 
 const client = makeClient({
     dbPath: DB_PATH,
-    intents: [
-        IntentsBitField.Flags.Guilds,
-        IntentsBitField.Flags.MessageContent,
-    ],
+    intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.MessageContent],
 });
 
 client.on(Events.ClientReady, async () => {

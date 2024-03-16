@@ -22,9 +22,7 @@ export const CONFIG_COMMAND = {
         .addSubcommand(requestChannel =>
             requestChannel
                 .setName("request-channel")
-                .setDescription(
-                    "Configure the channel to send pin requests to.",
-                )
+                .setDescription("Configure the channel to send pin requests to.")
                 .addChannelOption(channel =>
                     channel
                         .setName("channel")
@@ -40,9 +38,7 @@ export const CONFIG_COMMAND = {
                 .addRoleOption(anchor =>
                     anchor
                         .setName("anchor")
-                        .setDescription(
-                            "The anchor role as configured in Copa.",
-                        )
+                        .setDescription("The anchor role as configured in Copa.")
                         .setRequired(true),
                 )
                 .addRoleOption(stopBefore =>
@@ -82,10 +78,7 @@ export const CONFIG_COMMAND = {
 
             const { id: channelId } = channel;
 
-            await interaction.client.requestChannels.set(
-                interaction.guildId!,
-                channelId,
-            );
+            await interaction.client.requestChannels.set(interaction.guildId!, channelId);
 
             interaction.reply({
                 content: `Requests will now be sent to <#${channelId}>`,
@@ -93,10 +86,7 @@ export const CONFIG_COMMAND = {
             });
         } else if (subcommand == "copa-import") {
             const anchor = interaction.options.getRole("anchor", true);
-            const stopBefore = interaction.options.getRole(
-                "stop-before",
-                false,
-            );
+            const stopBefore = interaction.options.getRole("stop-before", false);
 
             const ignore = new Set();
             const migrate = new Map();
@@ -202,16 +192,11 @@ export const CONFIG_COMMAND = {
                     embeds: [
                         new EmbedBuilder()
                             .setColor(Colors.Red)
-                            .setDescription(
-                                `Failed to migrate ${failed.length} roles`,
-                            )
+                            .setDescription(`Failed to migrate ${failed.length} roles`)
                             .addFields({
                                 name: "Roles",
                                 value: failed
-                                    .map(
-                                        ([roleId, memberId]) =>
-                                            `<@${memberId}>: <@&${roleId}>`,
-                                    )
+                                    .map(([roleId, memberId]) => `<@${memberId}>: <@&${roleId}>`)
                                     .join("\n"),
                             }),
                     ],

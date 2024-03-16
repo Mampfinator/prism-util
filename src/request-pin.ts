@@ -18,11 +18,7 @@ import {
     TextInputBuilder,
     TextInputStyle,
 } from "discord.js";
-import {
-    INTERNAL_ERROR,
-    MISSING_PERMISSIONS,
-    NOT_CONFIGURED,
-} from "./constants";
+import { INTERNAL_ERROR, MISSING_PERMISSIONS, NOT_CONFIGURED } from "./constants";
 
 export const PIN_REQUEST_ALREADY_PINNED = new EmbedBuilder()
     .setDescription(":x: This message is already pinned, silly!")
@@ -51,9 +47,7 @@ export const PIN_REQUEST_APPROVED_MOD = new EmbedBuilder()
 
 export function makeRequestDeniedFeedback(reason?: string): EmbedBuilder {
     if (reason && reason.length > 0) {
-        return new EmbedBuilder(
-            structuredClone(PIN_REQUEST_DENIED_FEEDBACK.data),
-        ).addFields({
+        return new EmbedBuilder(structuredClone(PIN_REQUEST_DENIED_FEEDBACK.data)).addFields({
             name: "Reason",
             value: reason,
         });
@@ -88,15 +82,12 @@ export const REQUEST_PIN_COMMAND = {
             return command.editReply({ embeds: [MISSING_PERMISSIONS] });
         }
 
-        const requestChannelId = await command.client.requestChannels.get(
-            command.guildId!,
-        );
+        const requestChannelId = await command.client.requestChannels.get(command.guildId!);
         if (!requestChannelId) {
             return command.editReply({ embeds: [NOT_CONFIGURED] });
         }
 
-        const requestChannel =
-            await command.client.channels.fetch(requestChannelId);
+        const requestChannel = await command.client.channels.fetch(requestChannelId);
         if (!requestChannel || !requestChannel.isTextBased()) {
             return command.editReply({ embeds: [INTERNAL_ERROR] });
         }
@@ -130,9 +121,7 @@ export const REQUEST_PIN_COMMAND = {
          */
         const requestEmbed = new EmbedBuilder()
             .setColor(Colors.Aqua)
-            .setDescription(
-                `${requestingMember} is requesting a pin in ${command.channel}.`,
-            );
+            .setDescription(`${requestingMember} is requesting a pin in ${command.channel}.`);
 
         if (!!targetMessage.content && targetMessage.content.length > 0) {
             requestEmbed.addFields({
@@ -145,9 +134,7 @@ export const REQUEST_PIN_COMMAND = {
             requestEmbed.addFields({
                 name: "Stickers",
                 value: [
-                    ...targetMessage.stickers
-                        .mapValues(sticker => `\`sticker.name\``)
-                        .values(),
+                    ...targetMessage.stickers.mapValues(sticker => `\`sticker.name\``).values(),
                 ].join("\n"),
                 inline: true,
             });
@@ -238,11 +225,10 @@ export const REQUEST_PIN_COMMAND = {
             });
         }
 
-        const cancellationCollector =
-            requestedMessage.createMessageComponentCollector({
-                componentType: ComponentType.Button,
-                maxComponents: 1,
-            });
+        const cancellationCollector = requestedMessage.createMessageComponentCollector({
+            componentType: ComponentType.Button,
+            maxComponents: 1,
+        });
 
         /**
          * Whether either party (requesting user, mods) has acted on this request (cancelled/approved/denied).
@@ -276,11 +262,7 @@ export const REQUEST_PIN_COMMAND = {
                     ],
                 });
             } catch (error) {
-                if (
-                    !(error instanceof DiscordAPIError) ||
-                    Number(error.code) == 10008
-                )
-                    throw error;
+                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
             }
         });
 
@@ -300,11 +282,7 @@ export const REQUEST_PIN_COMMAND = {
             try {
                 await command.editReply({ components: [] });
             } catch (error) {
-                if (
-                    !(error instanceof DiscordAPIError) ||
-                    Number(error.code) == 10008
-                )
-                    throw error;
+                if (!(error instanceof DiscordAPIError) || Number(error.code) == 10008) throw error;
             }
 
             switch (response.customId) {
@@ -395,9 +373,7 @@ export const REQUEST_PIN_COMMAND = {
 
                     break;
                 default:
-                    throw new Error(
-                        `Unknown component ID in pin response: ${response.customId}.`,
-                    );
+                    throw new Error(`Unknown component ID in pin response: ${response.customId}.`);
             }
         });
     },
