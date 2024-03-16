@@ -39,9 +39,14 @@ function makeClient(options: CustomClientOptions): Client {
         namespace: "custom-role",
     });
 
-    client.on(Events.InteractionCreate, interaction => {
+    client.on(Events.InteractionCreate, async interaction => {
         if (!interaction.isCommand()) return;
-        client.commandLoader.handleInteraction(interaction);
+        try {
+            await client.commandLoader.handleInteraction(interaction);
+        } catch (err) {
+            console.error(err);
+            // TODO: user-facing error reporting.
+        }
     });
 
     return client;

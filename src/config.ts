@@ -98,7 +98,7 @@ export const CONFIG_COMMAND = {
                 false,
             );
 
-            const ignored = new Set();
+            const ignore = new Set();
             const migrate = new Map();
 
             for (const role of await interaction
@@ -106,14 +106,14 @@ export const CONFIG_COMMAND = {
                 .then(roles => roles.values())) {
                 if (
                     role.position < anchor.position ||
-                    (stopBefore && role.position >= stopBefore.position)
+                    (!!stopBefore && role.position >= stopBefore.position)
                 ) {
                     continue;
                 }
 
                 // custom roles are supposed to have *exactly* 1 member.
                 if (role.members.size != 1) {
-                    ignored.add(role.id);
+                    ignore.add(role.id);
                     continue;
                 }
 
@@ -131,8 +131,8 @@ export const CONFIG_COMMAND = {
                             {
                                 name: "Ignoring roles",
                                 value:
-                                    ignored.size > 0
-                                        ? Array.from(ignored)
+                                    ignore.size > 0
+                                        ? Array.from(ignore)
                                               .map(id => `<@&${id}>`)
                                               .join("\n")
                                         : "None",
