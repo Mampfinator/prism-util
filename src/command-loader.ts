@@ -45,21 +45,21 @@ export interface Command<T extends CommandType> {
 type CommandRecord = { [T in CommandType]: Command<T>[] };
 
 export class CommandLoader {
-    private readonly commands: CommandRecord;
+    private readonly commands: { [T in CommandType]: Map<string, Command<T>> } = Object.fromEntries(
+        COMMAND_TYPES.map(type => [type, {}]),
+    ) as any;
 
     constructor(public readonly client: Client) {
-        // TypeScript has trouble reasoning about this.
-        // This assertion *should* be valid.
-        this.commands = Object.fromEntries(
-            COMMAND_TYPES.map(type => [type, []]),
-        ) as any as CommandRecord;
     }
 
     /**
      * Add a command to the loader.
      */
     public addCommand<T extends CommandType>(command: Command<T>) {
-        this.commands[command.type].push(command);
+        if (this.commands[command.type].has(command.builder.name)) {
+            throw new Error(`Command name '${command.builder.name}' of type '${command.type}' already exists.`);
+        }
+        this.commands[command.type].set(command.builder.name, command);
     }
 
     getType(interaction: CommandInteraction): CommandType | undefined {
@@ -70,10 +70,6 @@ export class CommandLoader {
         } else if (interaction.isUserContextMenuCommand()) {
             return "UserContextMenuCommand";
         }
-    }
-
-    iterCommands(): Command<CommandType>[] {
-        return COMMAND_TYPES.map(type => this.commands[type]).flat();
     }
 
     /**
@@ -90,7 +86,7 @@ export class CommandLoader {
             return false;
         }
 
-        const command = this.commands[type].find(c => c.builder.name == interaction.commandName);
+        const command = this.commands[type].get(interaction.commandName);
 
         if (!command) {
             console.log(`${type} "${interaction.commandName}" not found.`);
@@ -105,9 +101,11 @@ export class CommandLoader {
      * Initialize all commands. This should be called before `register`.
      */
     public async init() {
-        for (const command of this.iterCommands()) {
-            if (command.init) {
-                await command.init(this.client);
+        for (const commandGroup of Object.values(this.commands)) {
+            for (const command of commandGroup.values()) {
+                if (command.init) {
+                    await command.init(this.client);
+                }
             }
         }
     }
@@ -118,10 +116,12 @@ export class CommandLoader {
      * @param debugGuildId If set, all commands will be registered only in this guild. This is meant for debugging. Omit for global registration.
      */
     public async register(debugGuildId?: string) {
-        for (const command of this.iterCommands()) {
-            console.log(`Registering command "${command.builder.name}" of type "${command.type}".`);
+        for (const commandGroup of Object.values(this.commands)) {
+            for (const command of commandGroup.values()) {
+                console.log(`Registering command "${command.builder.name}" of type "${command.type}".`);
 
-            await this.client.application!.commands.create(command.builder, debugGuildId);
+                await this.client.application!.commands.create(command.builder, debugGuildId);
+            }
         }
     }
 
@@ -138,3 +138,4 @@ export class CommandLoader {
         }
     }
 }
+
