@@ -1,4 +1,5 @@
 import {
+    AttachmentBuilder,
     ChannelType,
     ChatInputCommandInteraction,
     Client,
@@ -219,9 +220,50 @@ async function handleMessageDelete(message: Message | PartialMessage) {
     }
 }
 
-function handleMessageBulkDelete(
+async function handleMessageBulkDelete(
     messages: Collection<Snowflake, Message | PartialMessage>,
     channel: GuildTextBasedChannel,
 ) {
-    // TODO
+    if (!channel) return;
+
+    const logChannelId = await channel.client.logChannels.get(channel.guildId!).catch(() => {});
+    if (!logChannelId) return;
+
+    const logChannel = (await channel.client.channels
+        .fetch(logChannelId)
+        .catch(() => {})) as GuildTextBasedChannel | null | void;
+    if (!logChannel) return;
+
+    let messagesString = "";
+
+    for (const message of messages.values()) {
+        if (message.author?.bot) continue;
+        if (!message.inGuild()) continue;
+        if (message.channelId != channel.id) continue;
+
+        messagesString += `${message.author.username} (${message.member!.id}): ${
+            message.content
+        }}\n`;
+
+        if (message.attachments.size > 0) {
+            messagesString += `Attachments: \n${[
+                ...message.attachments.mapValues(attachment => `   - ${attachment.url}`).values(),
+            ].join("\n")}\n`;
+        }
+
+        messagesString += "------------------------------------\n";
+    }
+
+    const attachment = new AttachmentBuilder(Buffer.from(messagesString, "utf-8"), {
+        name: "messages.txt",
+    });
+
+    logChannel.send({
+        embeds: [
+            new EmbedBuilder()
+                .setDescription(`**${messages.size}** messages bulk deleted in ${channel.id}.`)
+                .setColor(Colors.Red),
+        ],
+        files: [attachment],
+    });
 }
