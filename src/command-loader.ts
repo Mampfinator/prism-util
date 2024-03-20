@@ -46,18 +46,19 @@ type CommandRecord = { [T in CommandType]: Command<T>[] };
 
 export class CommandLoader {
     private readonly commands: { [T in CommandType]: Map<string, Command<T>> } = Object.fromEntries(
-        COMMAND_TYPES.map(type => [type, {}]),
+        COMMAND_TYPES.map(type => [type, new Map()]),
     ) as any;
 
-    constructor(public readonly client: Client) {
-    }
+    constructor(public readonly client: Client) {}
 
     /**
      * Add a command to the loader.
      */
     public addCommand<T extends CommandType>(command: Command<T>) {
         if (this.commands[command.type].has(command.builder.name)) {
-            throw new Error(`Command name '${command.builder.name}' of type '${command.type}' already exists.`);
+            throw new Error(
+                `Command name '${command.builder.name}' of type '${command.type}' already exists.`,
+            );
         }
         this.commands[command.type].set(command.builder.name, command);
     }
@@ -118,7 +119,9 @@ export class CommandLoader {
     public async register(debugGuildId?: string) {
         for (const commandGroup of Object.values(this.commands)) {
             for (const command of commandGroup.values()) {
-                console.log(`Registering command "${command.builder.name}" of type "${command.type}".`);
+                console.log(
+                    `Registering command "${command.builder.name}" of type "${command.type}".`,
+                );
 
                 await this.client.application!.commands.create(command.builder, debugGuildId);
             }
@@ -138,4 +141,3 @@ export class CommandLoader {
         }
     }
 }
-
