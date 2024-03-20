@@ -5,6 +5,7 @@ import { CommandLoader } from "./command-loader";
 import { CONFIG_COMMAND } from "./config";
 import { REQUEST_PIN_COMMAND } from "./request-pin";
 import { CUSTOM_ROLE_COMMAND } from "./custom-role";
+import { LOGGING_COMMAND } from "./logging";
 
 const DB_PATH = process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`;
 
@@ -17,6 +18,7 @@ declare module "discord.js" {
         readonly commandLoader: CommandLoader;
         readonly requestChannels: Keyv;
         readonly customRoles: Keyv;
+        readonly logChannels: Keyv;
     }
 }
 
@@ -32,6 +34,10 @@ function makeClient(options: CustomClientOptions): Client {
     //@ts-ignore
     client.customRoles = new Keyv(options.dbPath, {
         namespace: "custom-role",
+    });
+    //@ts-ignore
+    client.logChannels = new Keyv(options.dbPath, {
+        namespace: "log-channel",
     });
 
     client.on(Events.InteractionCreate, async interaction => {
@@ -49,13 +55,18 @@ function makeClient(options: CustomClientOptions): Client {
 
 const client = makeClient({
     dbPath: DB_PATH,
-    intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.MessageContent],
+    intents: [
+        IntentsBitField.Flags.Guilds,
+        IntentsBitField.Flags.MessageContent,
+        IntentsBitField.Flags.GuildMessages,
+    ],
 });
 
 client.on(Events.ClientReady, async () => {
     client.commandLoader.addCommand(CONFIG_COMMAND);
     client.commandLoader.addCommand(REQUEST_PIN_COMMAND);
     client.commandLoader.addCommand(CUSTOM_ROLE_COMMAND);
+    client.commandLoader.addCommand(LOGGING_COMMAND);
 
     await client.commandLoader.init();
 
