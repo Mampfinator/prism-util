@@ -126,7 +126,7 @@ export const REQUEST_PIN_COMMAND = {
         if (!!targetMessage.content && targetMessage.content.length > 0) {
             requestEmbed.addFields({
                 name: "Message",
-                value: targetMessage.content,
+                value: `Message from <@${targetMessage.author.id}>: ${targetMessage.content}`,
             });
         }
 
