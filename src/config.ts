@@ -49,7 +49,7 @@ export const CONFIG_COMMAND = {
                         )
                         .setRequired(false),
                 ),
-        ) as SlashCommandBuilder,
+        ),
     execute: async (interaction: ChatInputCommandInteraction) => {
         const subcommand = interaction.options.getSubcommand(true) as
             | "request-channel"

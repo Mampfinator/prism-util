@@ -41,7 +41,7 @@ export const LOGGING_COMMAND = {
         )
         .addSubcommand(disable =>
             disable.setName("disable").setDescription("Disable logging for the bot."),
-        ) as SlashCommandBuilder,
+        ),
     init(client: Client) {
         console.log("Initializing logging command.");
 

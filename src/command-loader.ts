@@ -5,6 +5,7 @@ import {
     ContextMenuCommandBuilder,
     MessageContextMenuCommandInteraction,
     SlashCommandBuilder,
+    SlashCommandSubcommandsOnlyBuilder,
     UserContextMenuCommandInteraction,
 } from "discord.js";
 
@@ -19,7 +20,7 @@ export type CommandType = (typeof COMMAND_TYPES)[number];
  * Lookup table for `Command`s.
  */
 type BuilderTypes = {
-    SlashCommand: SlashCommandBuilder;
+    SlashCommand: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder;
     MessageContextMenuCommand: ContextMenuCommandBuilder;
     UserContextMenuCommand: ContextMenuCommandBuilder;
 };

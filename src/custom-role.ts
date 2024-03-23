@@ -34,7 +34,7 @@ export const CUSTOM_ROLE_COMMAND = {
         )
         .addSubcommand(remove =>
             remove.setName("delete").setDescription("Delete your custom role."),
-        ) as SlashCommandBuilder,
+        ),
     init(client: Client) {
         client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
             const customRoles = newMember.client.customRoles;
