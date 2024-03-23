@@ -32,10 +32,15 @@ export const LOGGING_COMMAND = {
                 .addChannelOption(channel =>
                     channel
                         .setName("channel")
-                        .setDescription("The channel to log messages to.")
+                        .setDescription(
+                            "The channel to log messages to. If not set, tells you the currently configured channel.",
+                        )
                         .setRequired(false)
                         .addChannelTypes(ChannelType.GuildText),
                 ),
+        )
+        .addSubcommand(disable =>
+            disable.setName("disable").setDescription("Disable logging for the bot."),
         ) as SlashCommandBuilder,
     init(client: Client) {
         console.log("Initializing logging command.");
@@ -74,6 +79,12 @@ export const LOGGING_COMMAND = {
 
             return interaction.reply({
                 content: `Logging is being sent to <#${channelId}>`,
+                ephemeral: true,
+            });
+        } else if (subcommand == "disable") {
+            await interaction.client.logChannels.delete(interaction.guildId!);
+            return interaction.reply({
+                content: "Logging disabled.",
                 ephemeral: true,
             });
         }
