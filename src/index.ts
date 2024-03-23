@@ -5,7 +5,7 @@ import { CommandLoader } from "./command-loader";
 import { CONFIG_COMMAND } from "./config";
 import { REQUEST_PIN_COMMAND } from "./request-pin";
 import { CUSTOM_ROLE_COMMAND } from "./custom-role";
-import { LOGGING_COMMAND } from "./logging";
+import { IgnoreChannels, LOGGING_COMMAND } from "./logging";
 
 const DB_PATH = process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`;
 
@@ -19,9 +19,24 @@ declare module "discord.js" {
         readonly requestChannels: Keyv;
         readonly customRoles: Keyv;
         readonly logChannels: Keyv;
+        /**
+         * Channels that should be ignored from logging.
+         */
+        readonly ignoredChannels: IgnoreChannels;
     }
 }
 
+interface ObjectConstructor {
+    /**
+     * Groups members of an iterable according to the return value of the passed callback.
+     * @param items An iterable.
+     * @param keySelector A callback which will be invoked for each item in items.
+     */
+    groupBy<K extends PropertyKey, T>(
+        items: Iterable<T>,
+        keySelector: (item: T, index: number) => K,
+    ): Partial<Record<K, T[]>>;
+}
 function makeClient(options: CustomClientOptions): Client {
     const client = new Client(options);
 
@@ -39,6 +54,8 @@ function makeClient(options: CustomClientOptions): Client {
     client.logChannels = new Keyv(options.dbPath, {
         namespace: "log-channel",
     });
+    // @ts-ignore
+    client.ignoredChannels = new IgnoreChannels(options.dbPath);
 
     client.on(Events.InteractionCreate, async interaction => {
         if (!interaction.isCommand()) return;

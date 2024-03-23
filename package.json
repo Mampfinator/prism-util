@@ -19,7 +19,8 @@
     "keyv": "^4.5.4"
   },
   "devDependencies": {
+    "@types/node": "^20.11.30",
     "prettier": "^3.1.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.4.3"
   }
 }

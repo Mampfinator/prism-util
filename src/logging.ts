@@ -7,6 +7,7 @@ import {
     Colors,
     EmbedBuilder,
     Events,
+    GuildChannel,
     GuildMember,
     GuildTextBasedChannel,
     Message,
@@ -17,6 +18,71 @@ import {
     Snowflake,
 } from "discord.js";
 import { pluralize, asymmetricDiff } from "./util";
+import Keyv from "keyv";
+
+export class IgnoreChannels {
+    private readonly db: Keyv;
+
+    constructor(dbPath: string) {
+        this.db = new Keyv(dbPath, { namespace: "ignore-channels" });
+    }
+
+    public async shouldIgnore(channel: GuildChannel): Promise<boolean> {
+        const ignoreChannels = await this.db
+            .get(channel.guildId!)
+            .then(str => (str ? new Set(JSON.parse(str)) : undefined));
+
+        if (!ignoreChannels) return false;
+
+        return ignoreChannels.has(channel.id) || ignoreChannels.has(channel.parentId!);
+    }
+
+    public async ignore(channel: GuildChannel) {
+        const ignoreChannels = await this.list(channel.guildId);
+
+        console.log(ignoreChannels);
+
+        if (!ignoreChannels) {
+            await this.save(channel.guildId, new Set([channel.id]));
+        } else {
+            ignoreChannels.add(channel.id);
+            await this.save(channel.guildId, ignoreChannels);
+        }
+    }
+
+    /**
+     * Unignore a channel. Returns whether the channel was ignored in the first place.
+     */
+    public async unignore(channel: GuildChannel): Promise<boolean> {
+        const ignoreChannels = await this.list(channel.id);
+
+        if (!ignoreChannels) return false;
+
+        const ignored = ignoreChannels.delete(channel.id);
+
+        if (ignored) {
+            await this.save(channel.guildId, ignoreChannels);
+        }
+
+        return ignored;
+    }
+
+    public async list(guildId: Snowflake): Promise<Set<Snowflake> | undefined> {
+        let raw = await this.db.get(guildId);
+
+        console.log(raw);
+
+        if (!raw) return undefined;
+
+        if (!Array.isArray(raw)) raw = JSON.parse(raw);
+
+        return new Set(raw);
+    }
+
+    private async save(guildId: Snowflake, ignoreChannels: Set<Snowflake>) {
+        await this.db.set(guildId, JSON.stringify([...ignoreChannels]));
+    }
+}
 
 export const LOGGING_COMMAND = {
     type: "SlashCommand" as const,
@@ -41,6 +107,41 @@ export const LOGGING_COMMAND = {
         )
         .addSubcommand(disable =>
             disable.setName("disable").setDescription("Disable logging for the bot."),
+        )
+        .addSubcommandGroup(ignore =>
+            ignore
+                .setName("ignore")
+                .setDescription("Configure ignore lists.")
+                .addSubcommand(list => list.setName("list").setDescription("List ignore settings."))
+                .addSubcommand(reset =>
+                    reset.setName("reset").setDescription("Reset ignore settings."),
+                )
+                .addSubcommand(unignore =>
+                    unignore
+                        .setName("unignore")
+                        .setDescription("Unignore a channel.")
+                        .addChannelOption(channel =>
+                            channel
+                                .setName("channel")
+                                .setDescription(
+                                    "The channel to unignore. If omitted, unignores the current channel.",
+                                )
+                                .setRequired(true),
+                        ),
+                )
+                .addSubcommand(ignore =>
+                    ignore
+                        .setName("ignore")
+                        .setDescription("Ignore a single channel.")
+                        .addChannelOption(channel =>
+                            channel
+                                .setName("channel")
+                                .setDescription(
+                                    "The channel to ignore. If omitted, ignores the current channel.",
+                                )
+                                .setRequired(false),
+                        ),
+                ),
         ),
     init(client: Client) {
         console.log("Initializing logging command.");
@@ -50,9 +151,15 @@ export const LOGGING_COMMAND = {
         client.on(Events.MessageBulkDelete, handleMessageBulkDelete);
     },
     execute: async (interaction: ChatInputCommandInteraction) => {
-        const subcommand = interaction.options.getSubcommand(true) as "channel";
+        const group = interaction.options.getSubcommandGroup(false) as "ignore" | undefined;
+        const subcommand = interaction.options.getSubcommand(true) as
+            | "ignore"
+            | "unignore"
+            | "disable"
+            | "list"
+            | "channel";
 
-        if (subcommand == "channel") {
+        if (!group && subcommand == "channel") {
             const channel = interaction.options.getChannel("channel", false);
 
             if (!channel) {
@@ -81,12 +188,127 @@ export const LOGGING_COMMAND = {
                 content: `Logging is being sent to <#${channelId}>`,
                 ephemeral: true,
             });
-        } else if (subcommand == "disable") {
+        } else if (!group && subcommand == "disable") {
             await interaction.client.logChannels.delete(interaction.guildId!);
             return interaction.reply({
                 content: "Logging disabled.",
                 ephemeral: true,
             });
+        } else if (group == "ignore") {
+            if (subcommand == "ignore") {
+                const toIgnore = (interaction.options.getChannel("channel", false) ??
+                    interaction.channel) as GuildChannel;
+
+                await interaction.client.ignoredChannels.ignore(toIgnore);
+
+                await interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setDescription(`Ignored <#${toIgnore.id}>`)
+                            .setColor(Colors.Green),
+                    ],
+                    ephemeral: true,
+                });
+            } else if (subcommand == "unignore") {
+                const toUnignore = (interaction.options.getChannel("channel", false) ??
+                    interaction.channel) as GuildChannel;
+
+                const wasIgnored = await interaction.client.ignoredChannels.unignore(toUnignore);
+
+                if (wasIgnored) {
+                    await interaction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setDescription(`Unignored <#${toUnignore.id}>`)
+                                .setColor(Colors.Red),
+                        ],
+                        ephemeral: true,
+                    });
+                } else {
+                    await interaction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setDescription(
+                                    `<#${toUnignore.id}> wasn't ignored, so there's nothing to unignore.`,
+                                )
+                                .setColor(Colors.Purple),
+                        ],
+                        ephemeral: true,
+                    });
+                }
+            } else if (subcommand == "list") {
+                const channelIds = await interaction.client.ignoredChannels
+                    .list(interaction.guildId!)
+                    .catch(() => {});
+
+                if (!channelIds || channelIds.size == 0) {
+                    return interaction.reply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setDescription("No channels ignored.")
+                                .setColor(Colors.Purple),
+                        ],
+                        ephemeral: true,
+                    });
+                }
+
+                const channels = await Promise.all(
+                    [...channelIds].map(async id =>
+                        interaction.client.channels.fetch(id).catch(() => {}),
+                    ),
+                ).then(channels => channels.filter(c => !!c) as GuildChannel[]);
+
+                // sort according to channel list
+                channels.sort((a, b) => a.position - b.position);
+
+                // TODO: pagination
+                // TODO: group under categories
+                /*
+                We want a list in the format of:
+                - [indicator] channel
+                - [indicator] category
+                        - [indicator] channel // overrides
+                        - [indicator] channel
+                        ...
+                */
+
+               const list = new Map<string, { channel?: GuildChannel, children: GuildChannel[] }>();
+
+                for (const channel of channels) {
+                    if (!channel.parentId &&!list.has(channel.id)) {
+                       list.set(channel.id, { channel: channel, children: [] });
+                       continue;
+                    }
+
+                    if (!!channel.parentId) {
+                        if (list.has(channel.parentId)) list.get(channel.parentId)!.children.push(channel);
+                        else list.set(channel.parentId, { children: [channel] });
+                    }
+                }
+
+                let description = "";
+
+                for (const [id, { channel, children }] of list) {
+                    const childList = `${children.map(c => `    - :x: <#${c.id}>`).join("\n")}\n`
+
+                    if (!channel) {
+                        description += `- :radio_button: <#${id}>\n${childList}`
+                    } else {
+                        description += `- :x: <#${id}>\n${childList}`
+                    }
+                }
+
+                return interaction.reply({
+                    embeds: [
+                        new EmbedBuilder()
+                            .setDescription(
+                                description
+                            )
+                            .setColor(Colors.Purple),
+                    ],
+                    ephemeral: true,
+                });
+            }
         }
     },
 };
