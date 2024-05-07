@@ -28,7 +28,11 @@ export const CONFIG_COMMAND = {
                         .setName("channel")
                         .setDescription("The channel to send pin requests to.")
                         .setRequired(false)
-                        .addChannelTypes(ChannelType.GuildText),
+                        .addChannelTypes(
+                            ChannelType.GuildText,
+                            ChannelType.PublicThread,
+                            ChannelType.PrivateThread,
+                        ),
                 ),
         )
         .addSubcommand(copaImport =>
