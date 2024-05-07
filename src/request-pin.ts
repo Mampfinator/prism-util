@@ -2,6 +2,7 @@ import {
     ActionRowBuilder,
     ApplicationCommandType,
     ButtonBuilder,
+    ButtonInteraction,
     ButtonStyle,
     Colors,
     ComponentType,
@@ -268,15 +269,10 @@ export const REQUEST_PIN_COMMAND = {
 
         const modCollector = requestMessage.createMessageComponentCollector({
             componentType: ComponentType.Button,
-            max: 1,
         });
 
-        modCollector.on("end", async collected => {
-            const response = collected.first();
-            if (!response) return;
-
+        modCollector.on("collect", async (response: ButtonInteraction) => {
             if (acted) return;
-            acted = true;
 
             // remove user-facing options so they can't cancel anymore.
             try {
@@ -311,6 +307,7 @@ export const REQUEST_PIN_COMMAND = {
                         }),
                     ]);
 
+                    modCollector.stop("pin-approved");
                     break;
                 case "request-pin-deny":
                     await response.showModal(
@@ -331,48 +328,67 @@ export const REQUEST_PIN_COMMAND = {
                             ),
                     );
 
-                    const modalResponse = await response.awaitModalSubmit({
-                        time: 2 * 60 * 1000, // 2 minutes are *definitely* enough to type up a reason.
-                    });
+                    const modalResponse = await response
+                        .awaitModalSubmit({
+                            time: 1 * 60 * 60 * 1000, // 1 hour
+                        })
+                        .catch(() => null);
 
-                    modalResponse.deferUpdate();
+                    // user closed the modal/fell asleep/..., we wait for the next modal.
+                    if (!modalResponse) return;
 
-                    const reason =
-                        modalResponse.fields
-                            .getField("reason", ComponentType.TextInput)
-                            ?.value?.trim() ?? "";
+                    try {
+                        if (!!(await modalResponse.deferUpdate().catch(() => null))) {
+                            // I'm not entirely sure why, but one user opening multiple modals before submitting one
+                            // can send multiple replies.
+                            // this should prevent that.
+                            return;
+                        }
 
-                    const responseEmbed = new EmbedBuilder(requestEmbed.data)
-                        .setDescription(
-                            `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
-                        )
-                        .setColor(Colors.Red);
+                        const reason =
+                            modalResponse.fields
+                                .getField("reason", ComponentType.TextInput)
+                                ?.value?.trim() ?? "";
 
-                    if (reason.length > 0) {
-                        responseEmbed.addFields({
-                            name: "Reason",
-                            value: reason,
+                        const responseEmbed = new EmbedBuilder(requestEmbed.data)
+                            .setDescription(
+                                `❌ Pin request by ${requestingMember} has been denied by ${response.member}`,
+                            )
+                            .setColor(Colors.Red);
+
+                        if (reason.length > 0) {
+                            responseEmbed.addFields({
+                                name: "Reason",
+                                value: reason,
+                            });
+                        }
+
+                        await response.editReply({
+                            components: [],
+                            embeds: [responseEmbed],
                         });
+
+                        await Promise.all([
+                            response.followUp({
+                                embeds: [PIN_REQUEST_DENIED_MOD],
+                                ephemeral: true,
+                            }),
+                            command.followUp({
+                                embeds: [makeRequestDeniedFeedback(reason)],
+                                ephemeral: true,
+                            }),
+                        ]);
+                    } catch (error) {
+                        // something went wrong. we don't want to crash the bot.
+                        // continuing would probably break something.
+                        console.error(error);
                     }
 
-                    await response.editReply({
-                        components: [],
-                        embeds: [responseEmbed],
-                    });
-
-                    await Promise.all([
-                        response.followUp({
-                            embeds: [PIN_REQUEST_DENIED_MOD],
-                            ephemeral: true,
-                        }),
-                        command.followUp({
-                            embeds: [makeRequestDeniedFeedback(reason)],
-                            ephemeral: true,
-                        }),
-                    ]);
+                    modCollector.stop("pin-denied");
 
                     break;
                 default:
+                    modCollector.stop("unknown-button");
                     throw new Error(`Unknown component ID in pin response: ${response.customId}.`);
             }
         });
