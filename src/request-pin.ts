@@ -1,4 +1,5 @@
 import {
+    APIEmbed,
     ActionRowBuilder,
     ApplicationCommandType,
     ButtonBuilder,
@@ -207,23 +208,39 @@ export const REQUEST_PIN_COMMAND = {
         });
 
         for (const embed of targetMessage.embeds) {
-            const newEmbed = {
+            const embedData = {
                 ...embed.data,
                 video: undefined,
                 provider: undefined,
             };
 
-            if (!newEmbed.image && embed.thumbnail) {
-                newEmbed.image = embed.thumbnail;
+            if (!embedData.image && embed.thumbnail) {
+                embedData.image = embed.thumbnail;
             }
 
-            await requestMessage.reply({
-                embeds: [newEmbed],
-                allowedMentions: {
-                    users: [],
-                    roles: [],
-                },
-            });
+            let newEmbed: null | APIEmbed = null;
+
+            // Normally we'd handle this with the Invalid Form Body responses further down, but
+            // Discord.js doesn't re-export ValidationError.
+            try {
+                newEmbed = new EmbedBuilder(embedData).toJSON();
+            } catch {}
+
+            if (!newEmbed) continue;
+
+            try {
+                await requestMessage.reply({
+                    embeds: [newEmbed],
+                    allowedMentions: {
+                        users: [],
+                        roles: [],
+                    },
+                });
+            } catch (error) {
+                // Handle `Invalid Form Body` errors.
+                if (error instanceof DiscordAPIError && Number(error.code) == 50035) continue;
+                throw error;
+            }
         }
 
         const cancellationCollector = requestedMessage.createMessageComponentCollector({
