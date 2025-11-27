@@ -5,6 +5,7 @@ import { CommandLoader } from "./command-loader";
 import { CONFIG_COMMAND } from "./config";
 import { REQUEST_PIN_COMMAND } from "./request-pin";
 import { CUSTOM_ROLE_COMMAND } from "./custom-role";
+import { register, StageNotifications } from "./stage-notifications";
 
 const DB_PATH = process.env.DB_PATH ?? `sqlite://${process.cwd()}/db.sqlite`;
 
@@ -17,9 +18,11 @@ declare module "discord.js" {
         readonly commandLoader: CommandLoader;
         readonly requestChannels: Keyv;
         readonly customRoles: Keyv;
+        readonly stageNotifications: StageNotifications;
     }
 }
 
+// TODO: instead of `makeClient`, extend `Client` directly.
 function makeClient(options: CustomClientOptions): Client {
     const client = new Client(options);
 
@@ -33,6 +36,10 @@ function makeClient(options: CustomClientOptions): Client {
     client.customRoles = new Keyv(options.dbPath, {
         namespace: "custom-role",
     });
+
+    //@ts-expect-error setting readonly property once
+    client.stageNotifications = new StageNotifications(options.dbPath);
+    register(client);
 
     client.on(Events.InteractionCreate, async interaction => {
         if (!interaction.isCommand()) return;
